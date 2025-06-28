@@ -1,4 +1,4 @@
-        let angle; // 枝の分岐角度
+let angle; // 枝の分岐角度
         let trunkLength; // 幹の初期の長さ
         let fruits = []; // 実の情報を格納する配列
         let particles = []; // パーティクルの配列
@@ -51,7 +51,8 @@
 
             drawClouds();
             
-            stars.forEach(star => star.draw());
+            stars = []; // 星の配列を毎フレームクリア
+            activeLeafNodes.clear();
 
             push();
             translate(width / 2, height);
@@ -59,6 +60,8 @@
             strokeWeight(map(mouseY, 0, height, 2, 8));
             branch(trunkLength, 0, 0);
             pop();
+
+            stars.forEach(star => star.draw()); // 星を描画
 
             manageFruits();
             drawFruits();
@@ -256,8 +259,17 @@
             constructor() {
                 this.x = random(-width, width);
                 this.y = random(height * 0.1, height * 0.6);
-                this.speed = random(0.5, 1.0);
+                this.speed = random(0.2, 0.8);
                 this.size = random(50, 150);
+                this.ellipses = [];
+                for (let i = 0; i < 5; i++) {
+                    this.ellipses.push({
+                        x_offset: i * (this.size / 5),
+                        y_offset: random(-5, 5),
+                        w: this.size / 2,
+                        h: this.size / 3
+                    });
+                }
             }
 
             move() {
@@ -270,9 +282,9 @@
             draw() {
                 fill(255, 255, 255, 150);
                 noStroke();
-                for (let i = 0; i < 5; i++) {
-                    ellipse(this.x + i * (this.size / 5), this.y + random(-5, 5), this.size / 2, this.size / 3);
-                }
+                this.ellipses.forEach(e => {
+                    ellipse(this.x + e.x_offset, this.y + e.y_offset, e.w, e.h);
+                });
             }
         }
 
