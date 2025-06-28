@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- PLEASE NO CHANGES BELOW THIS LINE (UNTIL I SAY SO) -->
+  <script language="javascript" type="text/javascript" src="libraries/p5.min.js"></script>
+  <script language="javascript" type="text/javascript" src="Yggdrasil.js"></script>
+  <!-- OK, YOU CAN MAKE CHANGES BELOW THIS LINE AGAIN -->
+
+    <title>デジタル・ユグドラシル</title>
+    <!-- p5.js ライブラリをCDNからロード -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* スクロールバーを非表示にする */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #0d1117; /* 暗めの背景色 */
+            font-family: 'Inter', sans-serif;
+            color: #e6edf3;
+        }
+        canvas {
+            display: block; /* canvasの下に余白ができないようにする */
+            border-radius: 12px; /* 角を丸くする */
+            box-shadow: 0 4px 12px rgba(0, 255, 255, 0.4); /* デジタルな光沢 */
+        }
+        .info-box {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(30, 40, 50, 0.8);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #8c9ba5;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+</body>
+</html>
