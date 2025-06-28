@@ -145,7 +145,40 @@
         // ==================================================
 
         // Fruits
-        function manageFruits() { /* ... */ }
+        function manageFruits() {
+            let visibleFruitCount = [...branchTipToFruitMap.values()].length;
+
+            fruits.forEach((fruit, index) => {
+                if (fruit.visible) {
+                    fruit.update();
+                    let associatedBranchId = [...branchTipToFruitMap.entries()].find(([key, value]) => value === index)?.[0];
+                    if (associatedBranchId && activeLeafNodes.has(associatedBranchId)) {
+                        let leafPos = activeLeafNodes.get(associatedBranchId);
+                        fruit.x = leafPos.x;
+                        fruit.y = leafPos.y;
+                    } else {
+                        // 枝がなくなったら実も消える
+                        fruit.visible = false;
+                        if(associatedBranchId) branchTipToFruitMap.delete(associatedBranchId);
+                    }
+                } else if (fruit.cooldown > 0) {
+                    fruit.cooldown--;
+                }
+            });
+
+            if (visibleFruitCount < CONFIG.FRUIT_COUNT) {
+                let unoccupiedBranchIds = [...activeLeafNodes.keys()].filter(id => ![...branchTipToFruitMap.keys()].includes(id));
+                if (unoccupiedBranchIds.length > 0) {
+                    let availableFruitIndex = fruits.findIndex(f => !f.visible && f.cooldown <= 0);
+                    if (availableFruitIndex !== -1) {
+                        let branchId = random(unoccupiedBranchIds);
+                        let pos = activeLeafNodes.get(branchId);
+                        fruits[availableFruitIndex].spawn(pos.x, pos.y);
+                        branchTipToFruitMap.set(branchId, availableFruitIndex);
+                    }
+                }
+            }
+        }
         function drawFruits() { fruits.forEach(f => f.visible && f.draw()); }
 
         // Stars
@@ -160,7 +193,73 @@
         // クラス定義 (Classes)
         // ==================================================
 
-        class Fruit { /* ... */ }
+        class Fruit {
+            constructor() {
+                this.x = 0; this.y = 0;
+                this.visible = false;
+                this.baseSize = random(10, 22);
+                this.targetSize = 0; this.currentSize = 0;
+                this.color = random(pastelColors);
+                this.growSpeed = random(0.05, 0.1);
+                this.lifespan = 0; this.maxLifespan = random(600, 1200);
+                this.cooldown = 0;
+            }
+
+            spawn(x, y) {
+                this.x = x; this.y = y;
+                this.visible = true;
+                this.currentSize = 0; this.targetSize = this.baseSize;
+                this.lifespan = 0; this.maxLifespan = random(600, 1200);
+                this.color = random(pastelColors);
+            }
+
+            update() {
+                this.lifespan++;
+                if (this.lifespan > this.maxLifespan) {
+                    this.visible = false;
+                    this.cooldown = 120;
+                    let associatedBranchId = [...branchTipToFruitMap.entries()].find(([key, value]) => value === fruits.indexOf(this))?.[0];
+                    if(associatedBranchId) branchTipToFruitMap.delete(associatedBranchId);
+                }
+            }
+
+            draw() {
+                this.currentSize = lerp(this.currentSize, this.targetSize, this.growSpeed);
+                let d = dist(mouseX, mouseY, this.x, this.y);
+
+                if (d < this.currentSize / 2 + 10) {
+                    this.targetSize = this.baseSize * 1.5;
+                    fill(255, 182, 193, 255);
+                    stroke(255, 255, 255, 200);
+                    strokeWeight(3);
+                } else {
+                    this.targetSize = this.baseSize;
+                    fill(this.color);
+                    noStroke();
+                }
+                
+                ellipse(this.x, this.y, this.currentSize, this.currentSize);
+
+                for (let j = 0; j < 3; j++) {
+                    fill(255, 255, 255, 80 - j * 25);
+                    ellipse(this.x, this.y, this.currentSize * (0.7 + j * 0.1), this.currentSize * (0.7 + j * 0.1));
+                }
+            }
+            
+            isClicked(mx, my) {
+                return this.visible && dist(mx, my, this.x, this.y) < this.currentSize / 2 + 10;
+            }
+
+            burst() {
+                for (let j = 0; j < 20; j++) {
+                    particles.push(new Particle(this.x, this.y, this.color));
+                }
+                this.visible = false;
+                this.cooldown = 120;
+                let associatedBranchId = [...branchTipToFruitMap.entries()].find(([key, value]) => value === fruits.indexOf(this))?.[0];
+                if(associatedBranchId) branchTipToFruitMap.delete(associatedBranchId);
+            }
+        }
         class Star { /* ... */ }
         class Cloud { /* ... */ }
         class Particle { /* ... */ }
