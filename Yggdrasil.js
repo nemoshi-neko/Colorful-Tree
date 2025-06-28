@@ -10,7 +10,7 @@
             TRUNK_LENGTH_RATIO: 0.2, // 幹の長さ (画面の高さに対する割合)
 
             STAR_MIN_SIZE: 2,       // 星の最小サイズ
-            STAR_MAX_SIZE: 5,       // 星の最大サイズ
+            STAR_MAX_SIZE: 10,       // 星の最大サイズ
             STAR_TWINKLE_SPEED: 4,  // 星のまたたきの速さ
         };
 
@@ -29,7 +29,6 @@
         let activeLeafNodes = new Map(); // 葉の先端 (実がなる場所)
         let branchNodes = [];      // 枝の途中 (星が生まれる場所)
         let branchTipToFruitMap = new Map();
-
 
         // ==================================================
         // p5.js ライフサイクル関数
@@ -62,7 +61,6 @@
             // 1. 背景の描画
             drawBackground();
             drawClouds();
-
 
             // 2. 木の描画と情報の更新
             activeLeafNodes.clear();
@@ -109,8 +107,6 @@
             branch(trunkLength, 0, 0);
             pop();
         }
-
-        // ==================================================
 
         function branch(len, depth, branchId) {
             strokeWeight(map(depth, 0, CONFIG.MAX_DEPTH, 8, 1));
@@ -346,14 +342,29 @@
                 this.speed = random(0.2, 0.8);
                 this.size = random(50, 150);
                 this.ellipses = [];
-
                 for (let i = 0; i < 5; i++) {
-                    let angle = -90 + i * 72;
-                    vertex(cos(angle) * size, sin(angle) * size);
-                    angle += 36;
-                    vertex(cos(angle) * (size / 2), sin(angle) * (size / 2));
+                    this.ellipses.push({
+                        x_offset: i * (this.size / 5),
+                        y_offset: random(-5, 5),
+                        w: this.size / 2,
+                        h: this.size / 3
+                    });
                 }
-                endShape(CLOSE);
+            }
+
+            move() {
+                this.x += this.speed;
+                if (this.x > width + this.size) {
+                    this.x = -this.size;
+                }
+            }
+
+            draw() {
+                fill(255, 255, 255, 150);
+                noStroke();
+                this.ellipses.forEach(e => {
+                    ellipse(this.x + e.x_offset, this.y + e.y_offset, e.w, e.h);
+                });
             }
         }
 
@@ -388,7 +399,6 @@
         // ==================================================
         // ユーティリティ
         // ==================================================
-
         function applyMatrixVector(v) {
             let m = drawingContext.getTransform();
             return createVector(v.x * m.a + v.y * m.c + m.e, v.x * m.b + v.y * m.d + m.f);
