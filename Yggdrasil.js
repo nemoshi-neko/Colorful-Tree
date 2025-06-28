@@ -1,4 +1,4 @@
-        // ==================================================
+// ==================================================
         // 設定 (CONFIG)
         // ==================================================
         const CONFIG = {
@@ -17,7 +17,7 @@
         // ==================================================
         // グローバル変数
         // ==================================================
-        let angle; 
+        let angle;
         let trunkLength;
         let pastelColors = [];
 
@@ -144,7 +144,6 @@
         // 要素の管理 (Manage) & 描画 (Draw)
         // ==================================================
 
-        // Fruits
         function manageFruits() {
             let visibleFruitCount = [...branchTipToFruitMap.values()].length;
 
@@ -156,10 +155,9 @@
                         let leafPos = activeLeafNodes.get(associatedBranchId);
                         fruit.x = leafPos.x;
                         fruit.y = leafPos.y;
-                    } else {
-                        // 枝がなくなったら実も消える
+                    } else if (associatedBranchId) {
                         fruit.visible = false;
-                        if(associatedBranchId) branchTipToFruitMap.delete(associatedBranchId);
+                        branchTipToFruitMap.delete(associatedBranchId);
                     }
                 } else if (fruit.cooldown > 0) {
                     fruit.cooldown--;
@@ -181,11 +179,27 @@
         }
         function drawFruits() { fruits.forEach(f => f.visible && f.draw()); }
 
-        // Stars
-        function manageStars() { /* ... */ }
+        function manageStars() {
+            let visibleStarCount = stars.filter(s => s.visible).length;
+
+            stars.forEach(star => {
+                if (star.visible) {
+                    star.update();
+                } else if (star.cooldown > 0) {
+                    star.cooldown--;
+                }
+            });
+
+            if (visibleStarCount < CONFIG.STAR_COUNT && branchNodes.length > 0) {
+                let availableStar = stars.find(s => !s.visible && s.cooldown <= 0);
+                if (availableStar) {
+                    let spawnPos = random(branchNodes);
+                    availableStar.spawn(spawnPos.x, spawnPos.y);
+                }
+            }
+        }
         function drawStars() { stars.forEach(s => s.visible && s.draw()); }
 
-        // Clouds & Particles
         function drawClouds() { clouds.forEach(c => { c.move(); c.draw(); }); }
         function drawParticles() { for (let i = particles.length - 1; i >= 0; i--) { particles[i].update(); particles[i].draw(); if (particles[i].isFinished()) particles.splice(i, 1); } }
 
@@ -260,9 +274,127 @@
                 if(associatedBranchId) branchTipToFruitMap.delete(associatedBranchId);
             }
         }
-        class Star { /* ... */ }
-        class Cloud { /* ... */ }
-        class Particle { /* ... */ }
+
+        class Star {
+            constructor() {
+                this.x = 0; this.y = 0;
+                this.size = 0;
+                this.angle = 0;
+                this.visible = false;
+                this.lifespan = 0;
+                this.maxLifespan = 0;
+                this.cooldown = 0;
+            }
+
+            spawn(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = random(CONFIG.STAR_MIN_SIZE, CONFIG.STAR_MAX_SIZE);
+                this.angle = random(360);
+                this.visible = true;
+                this.lifespan = 0;
+                this.maxLifespan = random(180, 300); // 3〜5秒で消える
+            }
+
+            update() {
+                this.lifespan++;
+                if (this.lifespan > this.maxLifespan) {
+                    this.visible = false;
+                    this.cooldown = random(120, 300); // 再出現までのクールダウン
+                }
+            }
+
+            draw() {
+                let brightness = 150 + 105 * sin(frameCount * CONFIG.STAR_TWINKLE_SPEED + this.x);
+
+                push();
+                translate(this.x, this.y);
+                rotate(this.angle);
+                
+                drawingContext.filter = 'blur(4px)';
+                fill(255, 255, 220, brightness / 2);
+                this.drawStarShape(this.size * 1.5);
+                
+                drawingContext.filter = 'none';
+                fill(255, 255, 220, brightness);
+                this.drawStarShape(this.size);
+                
+                pop();
+            }
+
+            drawStarShape(size) {
+                noStroke();
+                beginShape();
+                for (let i = 0; i < 5; i++) {
+                    let angle = -90 + i * 72;
+                    vertex(cos(angle) * size, sin(angle) * size);
+                    angle += 36;
+                    vertex(cos(angle) * (size / 2), sin(angle) * (size / 2));
+                }
+                endShape(CLOSE);
+            }
+        }
+
+        class Cloud {
+            constructor() {
+                this.x = random(-width, width);
+                this.y = random(height * 0.1, height * 0.6);
+                this.speed = random(0.2, 0.8);
+                this.size = random(50, 150);
+                this.ellipses = [];
+                for (let i = 0; i < 5; i++) {
+                    this.ellipses.push({
+                        x_offset: i * (this.size / 5),
+                        y_offset: random(-5, 5),
+                        w: this.size / 2,
+                        h: this.size / 3
+                    });
+                }
+            }
+
+            move() {
+                this.x += this.speed;
+                if (this.x > width + this.size) {
+                    this.x = -this.size;
+                }
+            }
+
+            draw() {
+                fill(255, 255, 255, 150);
+                noStroke();
+                this.ellipses.forEach(e => {
+                    ellipse(this.x + e.x_offset, this.y + e.y_offset, e.w, e.h);
+                });
+            }
+        }
+
+        class Particle {
+            constructor(x, y, fruitColor) {
+                this.x = x;
+                this.y = y;
+                this.vx = random(-2, 2);
+                this.vy = random(-2, 2);
+                this.alpha = 255;
+                this.size = random(3, 7);
+                this.color = fruitColor;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 5;
+            }
+
+            isFinished() {
+                return this.alpha < 0;
+            }
+
+            draw() {
+                noStroke();
+                fill(red(this.color), green(this.color), blue(this.color), this.alpha);
+                ellipse(this.x, this.y, this.size, this.size);
+            }
+        }
 
         // ==================================================
         // ユーティリティ
