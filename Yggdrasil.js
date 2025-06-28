@@ -1,55 +1,42 @@
         let angle; // 枝の分岐角度
         let trunkLength; // 幹の初期の長さ
         let fruits = []; // 実の情報を格納する配列
+        let particles = []; // パーティクルの配列
+        let stars = []; // 星の配列
+        let clouds = []; // 雲の配列
         const FRUIT_COUNT = 50; // 実の総数
         const MAX_DEPTH = 8; // 再帰の最大深度 (木の複雑さ)
         let pastelColors = []; // パステルカラーの配列
 
-        // グローバルマップ: どのbranchIdがどのfruitIndexを所有しているかを追跡
+        // グローバルマップ
         let branchTipToFruitMap = new Map();
-        // グローバルマップ: 現在のフレームでアクティブな葉の先端の位置を格納 (branchId -> {x, y})
         let activeLeafNodes = new Map();
 
         // P5.jsのセットアップ関数
         function setup() {
-            createCanvas(windowWidth * 0.8, windowHeight * 0.8); // ウィンドウサイズに合わせてキャンバスを作成
-            angleMode(DEGREES); // 角度を度数法に設定
-            pixelDensity(1); // 機器によるブレの補正
+            createCanvas(windowWidth * 0.8, windowHeight * 0.8);
+            angleMode(DEGREES);
+            pixelDensity(1);
             
-            // 可愛いパステルカラーの定義
             pastelColors = [
-                color(255, 182, 193, 200), // ライトピンク
-                color(255, 223, 186, 200), // ライトオレンジ
-                color(255, 255, 186, 200), // ライトイエロー
-                color(186, 255, 201, 200), // ミントグリーン
-                color(186, 225, 255, 200)  // ライトブルー
+                color(255, 182, 193, 200), color(255, 223, 186, 200),
+                color(255, 255, 186, 200), color(186, 255, 201, 200),
+                color(186, 225, 255, 200)
             ];
 
-            // 幹の長さをキャンバスの高さに基づいて設定
-            trunkLength = height * 0.2; 
-            
-            // 枝の初期角度をランダムに設定
+            trunkLength = height * 0.2;
             angle = random(20, 35);
 
-            // 実のプールを初期化: 全て非表示で初期サイズ0に設定
             for (let i = 0; i < FRUIT_COUNT; i++) {
-                fruits.push({
-                    x: 0, // 実の絶対X座標
-                    y: 0, // 実の絶対Y座標
-                    baseSize: random(10, 22), // 実の基準サイズ
-                    targetSize: 0, // 目標サイズ（アニメーション用）
-                    currentSize: 0, // 現在の描画サイズ（アニメーション用）
-                    color: random(pastelColors), // 実の色
-                    growSpeed: random(0.05, 0.1), // 成長速度
-                    visible: false, // 表示状態
-                    lifespan: 0, // 寿命カウンター
-                    maxLifespan: random(600, 1200), // 自動消滅までのフレーム数
-                    cooldown: 0 // 実が非表示になった後のクールダウン期間
-                });
+                fruits.push(new Fruit());
+            }
+            
+            // 雲の初期化
+            for (let i = 0; i < 5; i++) {
+                clouds.push(new Cloud());
             }
         }
 
-        // ウィンドウサイズが変更されたときにキャンバスをリサイズ
         function windowResized() {
             resizeCanvas(windowWidth * 0.8, windowHeight * 0.8);
             trunkLength = height * 0.2;
@@ -57,63 +44,243 @@
 
         // P5.jsの描画ループ関数
         function draw() {
-            background(250, 245, 255); // 淡いラベンダー色の背景
+            // 背景のグラデーション
+            let topColor = color(135, 206, 250); // 明るい空色
+            let bottomColor = color(240, 248, 255); // ほとんど白
+            setGradient(0, 0, width, height, topColor, bottomColor);
 
-            activeLeafNodes.clear(); // 毎フレーム、アクティブな葉の先端リストをクリア
-
-            // 画面中央に移動し、下から木を描画
-            push(); // 幹の描画と枝の再帰のために描画状態を保存
-            translate(width / 2, height); // 原点をキャンバス下中央に移動
-            stroke(160, 82, 45, 200); // 木の色 (茶色)
-            strokeWeight(map(mouseY, 0, height, 2, 8)); // マウスY座標に応じて幹の太さを変更
+            drawClouds();
             
-            // 枝の描画を開始。branchIdを0から開始し、枝の構造に応じてユニークなIDを渡す
-            branch(trunkLength, 0, 0); 
-            
-            pop(); // 幹と枝の描画状態を元に戻す
+            stars.forEach(star => star.draw());
 
-            manageFruits(); // 実のスポーンと消滅ロジックを処理
-            drawFruits();   // 実の描画ロジックを処理
+            push();
+            translate(width / 2, height);
+            stroke(139, 69, 19, 200);
+            strokeWeight(map(mouseY, 0, height, 2, 8));
+            branch(trunkLength, 0, 0);
+            pop();
+
+            manageFruits();
+            drawFruits();
+            drawParticles();
+        }
+        
+        // グラデーションを描画する関数
+        function setGradient(x, y, w, h, c1, c2) {
+            noFill();
+            for (let i = y; i <= y + h; i++) {
+                let inter = map(i, y, y + h, 0, 1);
+                let c = lerpColor(c1, c2, inter);
+                stroke(c);
+                line(x, i, x + w, i);
+            }
         }
 
-        // 再帰的に枝を描画する関数
-        function branch(len, depth, branchId) {
-            // 枝の太さを深度に応じて減衰させる
-            strokeWeight(map(depth, 0, MAX_DEPTH, 8, 1)); 
+        // 雲を描画する関数
+        function drawClouds() {
+            clouds.forEach(cloud => {
+                cloud.move();
+                cloud.draw();
+            });
+        }
 
-            // 枝の色を深度に応じて変化させる (幹は茶色、先端はピンクがかった白に)
-            let r = map(depth, 0, MAX_DEPTH, 160, 255);
-            let g = map(depth, 0, MAX_DEPTH, 82, 220);
-            let b = map(depth, 0, MAX_DEPTH, 45, 220);
+        // 枝を再帰的に描画する関数
+        function branch(len, depth, branchId) {
+            strokeWeight(map(depth, 0, MAX_DEPTH, 8, 1));
+            let r = map(depth, 0, MAX_DEPTH, 139, 255);
+            let g = map(depth, 0, MAX_DEPTH, 69, 220);
+            let b = map(depth, 0, MAX_DEPTH, 19, 220);
             stroke(r, g, b, 200);
 
-            line(0, 0, 0, -len); // 現在の場所から上向きに枝を描画
-            translate(0, -len); // 枝の先端に移動
+            line(0, 0, 0, -len);
+            translate(0, -len);
 
-            len *= 0.75; // 枝の長さを少し長めに
+            // 枝の途中に星を追加
+            if (random() > 0.95 && depth > 2) {
+                stars.push(new Star(0, 0));
+            }
 
-            depth++; // 深度を増やす
+            len *= 0.75;
+            depth++;
 
-            if (len > 6 && depth < MAX_DEPTH) { // 枝の長さが閾値より大きく、最大深度に達していない場合
-                // 左の枝
+            if (len > 6 && depth < MAX_DEPTH) {
                 push();
-                rotate(angle + sin(frameCount * 0.2 + depth * 15) * 4); // 揺れを緩やかに
+                rotate(angle + sin(frameCount * 0.2 + depth * 15) * 4);
                 branch(len, depth, branchId * 2 + 1);
                 pop();
 
-                // 右の枝
                 push();
-                rotate(-angle + cos(frameCount * 0.2 + depth * 15) * 4); // 揺れを緩やかに
+                rotate(-angle + cos(frameCount * 0.2 + depth * 15) * 4);
                 branch(len, depth, branchId * 2 + 2);
                 pop();
-            } else if (depth >= MAX_DEPTH) { // 最大深度に達した枝の先端に到達 (葉の先端)
-                let branchTipPos = createVector(0, 0); 
-                branchTipPos = applyMatrixVector(branchTipPos);
+            } else if (depth >= MAX_DEPTH) {
+                let branchTipPos = applyMatrixVector(createVector(0, 0));
                 activeLeafNodes.set(branchId, { x: branchTipPos.x, y: branchTipPos.y });
             }
         }
 
         // 実の管理
+        function manageFruits() {
+            // ... (既存のロジックをFruitクラスに移動)
+        }
+
+        // 実を描画
+        function drawFruits() {
+            fruits.forEach(fruit => {
+                if (fruit.visible) {
+                    fruit.draw();
+                }
+            });
+        }
+        
+        // パーティクルを描画
+        function drawParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].isFinished()) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // マウスクリック時のイベント
+        function mousePressed() {
+            for (let i = 0; i < fruits.length; i++) {
+                let fruit = fruits[i];
+                if (fruit.isClicked(mouseX, mouseY)) {
+                    // パーティクルを生成
+                    for (let j = 0; j < 20; j++) {
+                        particles.push(new Particle(fruit.x, fruit.y, fruit.color));
+                    }
+                    fruit.visible = false; // 実を消す
+                    let associatedBranchId = [...branchTipToFruitMap.entries()]
+                        .find(([key, value]) => value === i)?.[0];
+                    if(associatedBranchId) branchTipToFruitMap.delete(associatedBranchId);
+                    break;
+                }
+            }
+        }
+        
+        // Fruitクラス
+        class Fruit {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+                this.baseSize = random(10, 22);
+                this.targetSize = 0;
+                this.currentSize = 0;
+                this.color = random(pastelColors);
+                this.growSpeed = random(0.05, 0.1);
+                this.visible = false;
+                this.lifespan = 0;
+                this.maxLifespan = random(600, 1200);
+                this.cooldown = 0;
+            }
+
+            draw() {
+                let d = dist(mouseX, mouseY, this.x, this.y);
+                if (d < this.currentSize / 2 + 10) {
+                    this.targetSize = this.baseSize * 1.5;
+                    fill(255, 182, 193, 255);
+                    stroke(255, 255, 255, 200);
+                    strokeWeight(3);
+                } else {
+                    this.targetSize = this.baseSize;
+                    fill(this.color);
+                    noStroke();
+                }
+                
+                this.currentSize = lerp(this.currentSize, this.targetSize, this.growSpeed);
+                ellipse(this.x, this.y, this.currentSize, this.currentSize);
+
+                for (let j = 0; j < 3; j++) {
+                    fill(255, 255, 255, 80 - j * 25);
+                    ellipse(this.x, this.y, this.currentSize * (0.7 + j * 0.1), this.currentSize * (0.7 + j * 0.1));
+                }
+            }
+            
+            isClicked(mx, my) {
+                if (!this.visible) return false;
+                return dist(mx, my, this.x, this.y) < this.currentSize / 2 + 10;
+            }
+        }
+        
+        // Particleクラス
+        class Particle {
+            constructor(x, y, fruitColor) {
+                this.x = x;
+                this.y = y;
+                this.vx = random(-2, 2);
+                this.vy = random(-2, 2);
+                this.alpha = 255;
+                this.size = random(3, 7);
+                this.color = fruitColor;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 5;
+            }
+
+            isFinished() {
+                return this.alpha < 0;
+            }
+
+            draw() {
+                noStroke();
+                fill(red(this.color), green(this.color), blue(this.color), this.alpha);
+                ellipse(this.x, this.y, this.size, this.size);
+            }
+        }
+        
+        // Starクラス
+        class Star {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = random(1, 3);
+                this.brightness = random(150, 255);
+            }
+
+            draw() {
+                fill(255, 255, 200, this.brightness * abs(sin(frameCount * 0.1)));
+                noStroke();
+                ellipse(this.x, this.y, this.size, this.size);
+            }
+        }
+
+        // Cloudクラス
+        class Cloud {
+            constructor() {
+                this.x = random(-width, width);
+                this.y = random(height * 0.1, height * 0.6);
+                this.speed = random(0.5, 1.0);
+                this.size = random(50, 150);
+            }
+
+            move() {
+                this.x += this.speed;
+                if (this.x > width + this.size) {
+                    this.x = -this.size;
+                }
+            }
+
+            draw() {
+                fill(255, 255, 255, 150);
+                noStroke();
+                for (let i = 0; i < 5; i++) {
+                    ellipse(this.x + i * (this.size / 5), this.y + random(-5, 5), this.size / 2, this.size / 3);
+                }
+            }
+        }
+
+        function applyMatrixVector(v) {
+            let m = drawingContext.getTransform();
+            return createVector(v.x * m.a + v.y * m.c + m.e, v.x * m.b + v.y * m.d + m.f);
+        }
+
         function manageFruits() {
             let fruitIndexToBranchTipMap = new Map();
             for (let [branchId, fruitIndex] of branchTipToFruitMap.entries()) {
@@ -123,18 +290,13 @@
             for (let i = 0; i < fruits.length; i++) {
                 let fruit = fruits[i];
                 if (fruit.visible) {
-                    fruit.currentSize = lerp(fruit.currentSize, fruit.targetSize, fruit.growSpeed);
                     fruit.lifespan++;
-                    if (fruit.lifespan > fruit.maxLifespan && fruit.targetSize !== 0) {
-                        fruit.targetSize = 0;
-                    }
-                    if (fruit.currentSize < 1 && fruit.targetSize === 0) {
+                    if (fruit.lifespan > fruit.maxLifespan) {
                         fruit.visible = false;
                         let associatedBranchId = fruitIndexToBranchTipMap.get(i);
                         if (associatedBranchId !== undefined) {
                             branchTipToFruitMap.delete(associatedBranchId);
                         }
-                        fruit.cooldown = 30;
                     }
                     let associatedBranchId = fruitIndexToBranchTipMap.get(i);
                     if (associatedBranchId !== undefined && activeLeafNodes.has(associatedBranchId)) {
@@ -142,7 +304,7 @@
                         fruit.x = leafPos.x;
                         fruit.y = leafPos.y;
                     } else if (associatedBranchId !== undefined) {
-                        fruit.targetSize = 0;
+                        fruit.visible = false;
                     }
                 } else {
                     if (fruit.cooldown > 0) {
@@ -182,8 +344,6 @@
                     fruitToSpawn.x = branchPos.x;
                     fruitToSpawn.y = branchPos.y;
                     fruitToSpawn.visible = true;
-                    fruitToSpawn.baseSize = random(10, 22);
-                    fruitToSpawn.color = random(pastelColors);
                     fruitToSpawn.targetSize = fruitToSpawn.baseSize;
                     fruitToSpawn.currentSize = 0;
                     fruitToSpawn.lifespan = 0;
@@ -192,57 +352,4 @@
                     currentVisibleFruitCount++;
                 }
             }
-        }
-
-        // 実を描画する関数
-        function drawFruits() {
-            for (let i = 0; i < fruits.length; i++) {
-                let fruit = fruits[i];
-                if (!fruit.visible) continue;
-
-                let d = dist(mouseX, mouseY, fruit.x, fruit.y);
-
-                if (d < fruit.currentSize / 2 + 10) {
-                    if (fruit.targetSize !== fruit.baseSize * 1.5) {
-                        fruit.targetSize = fruit.baseSize * 1.5;
-                    }
-                    fill(255, 182, 193, 255); // 明るいピンク
-                    stroke(255, 255, 255, 200);
-                    strokeWeight(3);
-                } else {
-                    if (fruit.targetSize === fruit.baseSize * 1.5 || (fruit.targetSize !== 0 && fruit.lifespan <= fruit.maxLifespan)) {
-                        fruit.targetSize = fruit.baseSize;
-                    }
-                    fill(fruit.color);
-                    noStroke();
-                }
-
-                ellipse(fruit.x, fruit.y, fruit.currentSize, fruit.currentSize);
-
-                // 柔らかい光沢
-                for(let j = 0; j < 3; j++) {
-                    fill(255, 255, 255, 80 - j * 25);
-                    ellipse(fruit.x, fruit.y, fruit.currentSize * (0.7 + j * 0.1), fruit.currentSize * (0.7 + j * 0.1));
-                }
-            }
-        }
-
-        // マウスクリック時のイベント
-        function mousePressed() {
-            for (let i = 0; i < fruits.length; i++) {
-                let fruit = fruits[i];
-                if (!fruit.visible) continue;
-
-                let d = dist(mouseX, mouseY, fruit.x, fruit.y);
-                if (d < fruit.currentSize / 2 + 10) {
-                    fruit.color = color(255, 0, 255, 200); // マゼンタ色に変更
-                    break;
-                }
-            }
-        }
-
-        // 現在のtransformマトリックスを考慮してベクトルの絶対位置を計算するヘルパー関数
-        function applyMatrixVector(v) {
-            let m = drawingContext.getTransform();
-            return createVector(v.x * m.a + v.y * m.c + m.e, v.x * m.b + v.y * m.d + m.f);
         }
